@@ -31,6 +31,8 @@ public class GitMainTest1 {
 		token = args[0];
 		
 	    HashMap orgHash = GitGetOrgRepos.getOrgList(org, token);
+	    orgHash.remove("PANDORA");//for testing
+	    
 	    Iterator it = orgHash.entrySet().iterator();
 	    while (it.hasNext()) {
 	        Map.Entry pair = (Map.Entry)it.next();
@@ -48,7 +50,7 @@ public class GitMainTest1 {
 			//attempt top walk all the commits on the master
 			Git repo = GitCloneRepo.clone(REMOTE_URL, LOCAL_REPO_PATH,true);
 	        
-			ArrayList<CommitData> cd = GitGetData.listRepoContents(repo,"2018-09-01"); //test repo was create 9/23/2018, this should pull everything
+			ArrayList<CommitData> cd = GitGetData.listRepoContents(repo,"2018-09-13"); //test repo was create 9/23/2018, this should pull everything
 			
 			for (CommitData cdloop: cd) {
 				System.out.println(cdloop.toString());

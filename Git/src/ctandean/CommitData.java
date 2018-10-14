@@ -6,7 +6,7 @@ package ctandean;
  */
 
 public class CommitData {
-	private String sha1 = "";
+	private String commitSha1 = "";
 	private String branchName = "";
 	private String artifactPath = "";
 	private String artifactName = "";
@@ -16,12 +16,13 @@ public class CommitData {
 	private String longMessage = "";
 	private String commitDate = "";
 	private int pathLength = 0;
+	private String artifactSha1 = "";
 	
-	public CommitData(String sha1,String branchName,String artifactPath,
+	public CommitData(String commitSha1,String branchName,String artifactPath,
 					  String artifactName,String author,String commiter,
 					  String shortMessage,String longMessage,String commitDate,
-					  int pathLength) {
-		this.sha1 = sha1;
+					  int pathLength, String artifactSha1) {
+		this.commitSha1 = commitSha1;
 		this.branchName = branchName;
 		this.artifactPath = artifactPath;
 		this.artifactName = artifactName;
@@ -31,15 +32,15 @@ public class CommitData {
 		this.longMessage = longMessage;
 		this.commitDate = commitDate;
 		this.pathLength = pathLength;
-		
+		this.artifactSha1 = artifactSha1;
 	}
     
-	public void setSha1(String sha1) {
-		this.sha1 = sha1;
+	public void setCommitSha1(String sha1) {
+		this.commitSha1 = commitSha1;
 	}
 	
-	public String getSha1() {
-		return sha1;
+	public String getCommitSha1() {
+		return commitSha1;
 	}
 	
 	public void setBranchName(String branchName) {
@@ -114,11 +115,19 @@ public class CommitData {
 		return pathLength;
 	}
 	
+	public void setArtifactSha1(String sha1) {
+		this.artifactSha1 = artifactSha1;
+	}
+	
+	public String getArtifactSha1() {
+		return artifactSha1;
+	}
+	
 	public String toString() {
-		return "Sha1-ID: " + sha1 + " Branch Name: " + branchName + " Artifact Path: " + artifactPath
-				+ " Artifact Name: " + artifactName + " Author: " + author + " Committer: " + commiter
-				+ " Short Message: " + shortMessage + " Long Message: " + longMessage
-				+ " Commit Date: " + commitDate + " Path length: " + pathLength;	
+		return "CommitSha1-ID: " + commitSha1 + " ArtifactSha1-ID: " + artifactSha1 +" Branch Name: " + branchName 
+				+ " Artifact Path: " + artifactPath + " Artifact_Name: " + artifactName + " Author: " + author 
+				+ " Committer: " + commiter + " Short_Message: " + shortMessage + " Long_Message: " + longMessage
+				+ " Commit_Date: " + commitDate + " Path_length: " + pathLength;	
 	}
 	
 }

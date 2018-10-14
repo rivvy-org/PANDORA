@@ -44,6 +44,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  * https://github.com/eclipse/jgit/commit/1f6d43a6528212f270f0f4542ee0cb54cd1a2435#diff-89b3d87f8c852e16e57e7a5b35117e56 getAllRefs deprecated
  * https://stackoverflow.com/questions/47086943/how-to-find-the-branch-for-a-commit-with-jgit
  * https://stackoverflow.com/questions/28897658/how-do-you-get-the-name-of-a-git-tag-with-the-jgit-api
+ * https://stackoverflow.com/questions/2479348/is-it-possible-to-get-identical-sha1-hash
  */
 
 public class GitGetData {
@@ -62,7 +63,7 @@ public class GitGetData {
 		
 		//once a repo is cloned/reset
 		//attempt top walk all the commits on the master
-		//Git repo = GitCloneRepo.clone(REMOTE_URL, LOCAL_REPO_PATH,true);
+		Git repo = GitCloneRepo.clone(REMOTE_URL, LOCAL_REPO_PATH,true);
 		
 		//listCommits(repo);
 
@@ -73,13 +74,13 @@ public class GitGetData {
 		//iterateCommits(repo, "refs/remotes/origin/master");
 		
 		//get every commit in this repo
-		/*(
-		ArrayList<CommitData> cd = listRepoContents(repo,"2018-10-13");
+		
+		ArrayList<CommitData> cd = listRepoContents(repo,"2018-09-13");
 		
 		for (CommitData cdloop: cd) {
 			System.out.println(cdloop.toString());
 		}
-		*/
+		
 		
 		//System.out.println(getBranchName(repo, "c617bc281ad1756dac45638cebdc6bac129fba1d", "")) ;
 		
@@ -300,14 +301,16 @@ public class GitGetData {
             CommitData cd = new CommitData(commit.getId().getName(),getBranchName(git, commit.getId().getName(), "refs/heads"),
             			treeWalk.getPathString(), treeWalk.getNameString(), commit.getAuthorIdent().getName(), 
             			commit.getCommitterIdent().getName(), commit.getShortMessage(), commit.getFullMessage(), 
-            			convertEpoch(commit.getCommitTime()), treeWalk.getPathLength());
+            			convertEpoch(commit.getCommitTime()), treeWalk.getPathLength(), treeWalk.getObjectId(0).getName());
             comd.add(cd);
     
             /*
             System.out.println("found: " + getBranchName(git, commit.getId().getName(), "refs/heads") + " path: " + treeWalk.getPathString() + " name: "+treeWalk.getNameString() 
             + "\n author: "+commit.getAuthorIdent().getName() + " commiter: " +commit.getCommitterIdent().getName()
             + "\n short msg: "+commit.getShortMessage()+" long msg: "+commit.getFullMessage() 
-            + "\n commit time: " + convertEpoch(commit.getCommitTime()) + " path length: "+treeWalk.getPathLength() +" depth: "+treeWalk.getDepth());
+            + "\n commit time: " + convertEpoch(commit.getCommitTime()) + " path length: "+treeWalk.getPathLength() +" depth: "+treeWalk.getDepth()
+            + "\n Object id: "+ treeWalk.getObjectId(0).getName());
+            //note objectID(0) from a tree file is the file sh1 hash
         	*/
             }
             count++;
