@@ -1,5 +1,6 @@
 package ctandean;
 
+import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -20,8 +21,10 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -29,7 +32,20 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
+import org.eclipse.jgit.treewalk.AbstractTreeIterator;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.tmatesoft.svn.core.SVNDepth;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.wc.SVNClientManager;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc.SVNUpdateClient;
+import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
 /*
  * This is a class meant to contain methods that return data from a repository whether local or remote
@@ -45,6 +61,8 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  * https://stackoverflow.com/questions/47086943/how-to-find-the-branch-for-a-commit-with-jgit
  * https://stackoverflow.com/questions/28897658/how-do-you-get-the-name-of-a-git-tag-with-the-jgit-api
  * https://stackoverflow.com/questions/2479348/is-it-possible-to-get-identical-sha1-hash
+ * https://github.com/centic9/jgit-cookbook/blob/master/src/main/java/org/dstadler/jgit/porcelain/ShowBranchDiff.java
+ * https://gist.github.com/cliffdarling/2360866
  */
 
 public class GitGetData {
@@ -201,7 +219,7 @@ public class GitGetData {
 	 * 	String branchName - name of a given branch in repository
 	 * 		EX: local refs/heads/master , remote refs/remotes/origin/master
 	 * Returns:
-	 * 	ArrayList if Strings representing branch names
+	 * 	ArrayList if Strings representing branch names fully qualified
 	 * 	EX: local refs/heads/master , remote refs/remotes/origin/master
 	 */	
 	public static ArrayList<String> listBranchNames(Git git, ListMode m ) throws IOException,GitAPIException {
@@ -209,8 +227,8 @@ public class GitGetData {
         System.out.println("Listing local branches:\n");
         List<Ref> call = git.branchList().setListMode(m).call();
         for (Ref ref : call) {
-            System.out.println("Branch: " + ref );
-            retList.add(ref.getName());
+            System.out.println("Branch: " + ref.getObjectId().getName() + " " + ref.getTarget().getName());
+            retList.add(ref.getTarget().getName());
    
             }
 		return retList;
@@ -365,6 +383,136 @@ public class GitGetData {
 		return formattedDate;
 		
 	}
+	
+	/*
+	 * Copy of git cookbook:
+	 * https://github.com/centic9/jgit-cookbook/blob/master/src/main/java/org/dstadler/jgit/porcelain/ShowBranchDiff.java
+	 * Parameters:
+	 * 	Repository object
+	 * String branch name
+	 * Returns:
+	 * 	a AbtractTreeIterator. 
+	 */
+    public static AbstractTreeIterator prepareTreeParser(Repository repository, String ref) throws IOException {
+        // from the commit we can build the tree which allows us to construct the TreeParser
+        Ref head = repository.exactRef(ref);
+        try (RevWalk walk = new RevWalk(repository)) {
+            RevCommit commit = walk.parseCommit(head.getObjectId());
+            RevTree tree = walk.parseTree(commit.getTree().getId());
+
+            CanonicalTreeParser treeParser = new CanonicalTreeParser();
+            try (ObjectReader reader = repository.newObjectReader()) {
+                treeParser.reset(reader, tree.getId());
+            }
+
+            walk.dispose();
+
+            return treeParser;
+        }
+    }
+    
+    /*
+     * Finds all differences given 2 branches in a repository
+     * Parameters: 
+     * 	Git git - git object
+     *  String oldBranch - This can be used to reference the branch you want to compare too
+     *  String newBranch - This can be used to reference the branch you are making changes to
+     * Returns:
+     *	ArrayList of type DiffEntry, DiffEntry can return a few things useful but the 3 suggested are:
+     *	1 the changes time ex: MODIFY, ADD, DELETE use getChangeType()
+     *	2 the old branch path of the change	use getOldPath()
+     *	3 the new branch path of the change	use getNewPath()
+     *	Note: If such a path does not exist a output of /dev/null will be used instead.
+     *	EX: ADD /dev/null ENEX0005_new_release.sql 
+     *		or MODIFY ENEX0001_MP_TEST1.sql ENEX0001_MP_TEST1.sql 
+     *		or DELETE ENEX0005_new_release.sql /dev/null
+     */
+    public static ArrayList<DiffEntry> listBranchDiff(Git git, String oldBranch, String newBranch) throws IOException, GitAPIException {
+    	Repository repo = git.getRepository();
+    	
+        AbstractTreeIterator oldTreeParser = prepareTreeParser(repo, oldBranch); 
+        AbstractTreeIterator newTreeParser = prepareTreeParser(repo, newBranch); 
+        ArrayList<DiffEntry> diff = (ArrayList<DiffEntry>) git.diff().setOldTree(oldTreeParser).setNewTree(newTreeParser).call();
+        
+        /*
+        for (DiffEntry entry : diff) {
+            System.out.println("Entry: " + entry
+            		+ " " + entry.getChangeType().toString()
+            		+ " " + entry.getOldPath()
+            		+ " " + entry.getNewPath()
+            		);
+        }
+        */
+
+    	return diff;
+    }
+    
+    /*
+     * You are asking why we have svn commands in a git library? 
+     * This method is here to facilitate single artifact exports from Github
+     * This only works with Github as every git repository hosted there is also a svn repository
+     * Git by nature loves to clone, pulling only changes from a git repository involves cloning
+     * all artifacts. We are using svn here because we can and it is far easier to do so. 
+     * Parameters:
+     * 	String exportObj - this can be a top level directory, but in thi case we forcing this to always be a file from a git diff
+     *  File exportPath - top level folder destination where the export will go
+     *  String token - github auth token pelase generate and dont share
+     * Return:
+     * 	Nothing since this will just export
+     */
+    public static void githubSvnExport(String exportObj, File exportPath, String token) {
+    	
+		SVNRepository repository = null;
+		
+		try{
+			
+			repository = SVNRepositoryFactory.create(SVNURL.parseURIEncoded(SVNEncodingUtil.autoURIEncode(exportObj)));
+			//create authentication data
+			ISVNAuthenticationManager authManager =  SVNWCUtil.createDefaultAuthenticationManager("", token.toCharArray());
+			
+			
+			repository.setAuthenticationManager(authManager);
+			System.out.println( "Repository Root: " + repository.getRepositoryRoot( true ) );
+			System.out.println(  "Repository UUID: " + repository.getRepositoryUUID( true ) );
+			
+			long latestRevision = repository.getLatestRevision();
+			System.out.println(  "Repository Latest Revision: " + latestRevision);
+			
+			SVNClientManager ourClientManager = SVNClientManager.newInstance();
+			ourClientManager.setAuthenticationManager(authManager);
+			
+			SVNUpdateClient updateClient = ourClientManager.getUpdateClient( );
+			updateClient.setIgnoreExternals( false );
+			updateClient.doExport( repository.getLocation(), exportPath, 
+					SVNRevision.create(latestRevision), SVNRevision.create(latestRevision), 
+					null, true, SVNDepth.INFINITY);
+			/*
+			  static SVNDepth 	EMPTY
+	          		Just the named directory D, no entries.
+	          static SVNDepth 	EXCLUDE
+	          		Exclude (don't descend into) directory D.
+	          static SVNDepth 	FILES
+	          		D and its file children, but not subdirectories.
+	          static SVNDepth 	IMMEDIATES
+	          		D and its immediate children (D and its entries).
+	          static SVNDepth 	INFINITY
+	          		D and all descendants (full recursion from D).
+	          static SVNDepth 	UNKNOWN
+	          		Depth undetermined or ignored.
+			*/
+			
+		} catch (SVNException e) {
+			e.printStackTrace();
+		} finally {
+			System.out.println("Done");
+		}
+    	
+    	
+    }
+    
+    
+    
+    
 	
 	
 	
